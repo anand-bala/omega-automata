@@ -1,14 +1,16 @@
+import logging
 from typing import (
+    Set,
     Type,
     Tuple,
     Union,
     Callable,
     Hashable,
+    Iterable,
     Optional,
     FrozenSet,
     NamedTuple
 )
-from collections.abc import Set, Iterable
 
 import networkx as nx
 from dd.autoref import BDD  # TODO: Do I need to make this abstract?
@@ -44,20 +46,23 @@ class BuchiAutomaton(OmegaAutomaton):
         self._initial_state = 0
         self._acceptance_set = set()
 
+        self.log = logging.getLogger("BuchiAutomaton")
+
     @property
     def bdd_manager(self) -> BDD:
         return self._bdd_mgr
 
     @property
     def acceptance_set(self) -> Set[Edge]:
-        return self.acceptance_set
+        return self._acceptance_set
 
     @property
     def atomic_propositions(self) -> FrozenSet[str]:
         return frozenset(self._bdd_mgr.vars.keys())
 
-    def add_atomic_proposition(self, ap: str):
-        self._bdd_mgr.add_var(ap)
+    def add_atomic_propositions(self, *aps: str):
+        for ap in aps:
+            self._bdd_mgr.add_var(ap)
 
     def add_state(self, s: State):
         self._graph.add_node(s)
@@ -67,19 +72,27 @@ class BuchiAutomaton(OmegaAutomaton):
         return self._graph.number_of_nodes()
 
     @property
-    def states(self) -> Set[State]:
-        return frozenset(self._graph.nodes)
+    def states(self) -> Iterable[State]:
+        return self._graph.nodes
 
-    def add_edge(self, src: State, dst: State, label: Function):
-        self._graph.add_edge(src, dst, label=label)
+    def add_edge(
+        self, src: State, dst: State, label: Function, accept: Optional[bool] = None
+    ):
+        attr = dict(label=label)
+        if accept is not None:
+            attr["accept"] = accept
+
+        key = self._graph.add_edge(src, dst, **attr)
+        if accept is not None and accept is True:
+            self.acceptance_set.add(Edge(src=src, dst=dst, key=key))
 
     @property
     def num_edges(self) -> int:
         return self._graph.number_of_edges()
 
     @property
-    def edges(self) -> Set[Edge]:
-        return frozenset(self.edges)
+    def edges(self) -> Iterable[Edge]:
+        return map(lambda tup: Edge(*tup), self._graph.edges)
 
     def is_accepting(self, edge: Edge) -> bool:
         return edge in self.acceptance_set
@@ -90,11 +103,12 @@ class BuchiAutomaton(OmegaAutomaton):
 
     @initial_state.setter
     def initial_state(self, s: State):
-        if s in self._graph.nodes:
+        if s in self._graph:
             self._initial_state = s
-        raise ValueError(
-            "can't make State {} an initial state as it is not in the Automaton."
-        )
+        else:
+            raise ValueError(
+                "can't make State {} an initial state as it is not in the Automaton."
+            )
 
     def successors(self, src: State, letter: Function) -> Iterable[Edge]:
         for dst in self._graph.successors(src):
@@ -119,14 +133,24 @@ class BuchiAutomaton(OmegaAutomaton):
         for src in self._graph.nodes:
             whole: Function = self.bdd_manager.false
             for dst in self._graph[src].keys():
-                for key in self._graph[dst].keys():
+                for key in self._graph[src][dst].keys():
                     label: Function = self._graph[src][dst][key]["label"]
                     if label <= (~whole):
                         whole |= label
                     else:
+                        self.log.debug(
+                            "Overlapping labels for state {}: dst = {}, label = {}".format(
+                                src, dst, label.to_expr()
+                            )
+                        )
                         return False
 
             if complete and whole != self.bdd_manager.true:
+                self.log.debug(
+                    "Incomplete transitions for state {}: whole = {}".format(
+                        src, whole.to_expr()
+                    )
+                )
                 return False
         return True
 
@@ -139,7 +163,7 @@ class BuchiAutomaton(OmegaAutomaton):
         for src in self._graph.nodes:
             whole: Function = self.bdd_manager.false
             for dst in self._graph[src].keys():
-                for key in self._graph[dst].keys():
+                for key in self._graph[src][dst].keys():
                     label: Function = self._graph[src][dst][key]["label"]
                     whole = whole | label
             if whole != self.bdd_manager.true:

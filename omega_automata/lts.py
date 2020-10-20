@@ -1,7 +1,6 @@
 import abc
 from abc import ABC, abstractmethod
-from typing import Tuple, Union, Callable, Hashable, Optional, FrozenSet
-from collections.abc import Set, Iterable
+from typing import Set, Tuple, Union, Callable, Hashable, Iterable, Optional, FrozenSet
 
 from dd._abc import BDD as AbstractBDD
 from dd._abc import Operator
@@ -26,7 +25,7 @@ class OmegaAutomaton(ABC):
         pass
 
     @abstractmethod
-    def add_atomic_proposition(self, ap: str):
+    def add_atomic_propositions(self, *ap: str):
         pass
 
     @abstractmethod
@@ -42,7 +41,7 @@ class OmegaAutomaton(ABC):
 
     @property
     @abstractmethod
-    def states(self) -> Set[State]:
+    def states(self) -> Iterable[State]:
         """The set of states in the automaton."""
         pass
 
@@ -59,7 +58,7 @@ class OmegaAutomaton(ABC):
 
     @property
     @abstractmethod
-    def edges(self) -> Set[Edge]:
+    def edges(self) -> Iterable[Edge]:
         """Set of all edges in the automaton."""
         pass
 
