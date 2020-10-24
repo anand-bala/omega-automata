@@ -15,6 +15,7 @@ from typing import (
 import networkx as nx
 from dd.autoref import BDD  # TODO: Do I need to make this abstract?
 from dd.autoref import Function
+from networkx.classes.filters import no_filter
 
 from omega_automata.lts import OmegaAutomaton
 
@@ -93,6 +94,9 @@ class BuchiAutomaton(OmegaAutomaton):
     @property
     def edges(self) -> Iterable[Edge]:
         return map(lambda tup: Edge(*tup), self._graph.edges)
+
+    def get_transitions_from(self, src: State) -> Iterable[Edge]:
+        return filter(lambda e: e.src == src, self.edges)
 
     def is_accepting(self, edge: Edge) -> bool:
         return edge in self.acceptance_set
@@ -173,8 +177,8 @@ class BuchiAutomaton(OmegaAutomaton):
     def strongly_connected_components(
         self,
         *,
-        state_filter: Optional[Callable[[State], bool]] = None,
-        edge_filter: Optional[Callable[[State, State], bool]] = None,
+        state_filter: Optional[Callable[[State], bool]] = no_filter,
+        edge_filter: Optional[Callable[[State, State], bool]] = no_filter,
     ) -> Iterable[Set[State]]:
         G = nx.subgraph_view(
             self._graph, filter_node=state_filter, filter_edge=edge_filter
