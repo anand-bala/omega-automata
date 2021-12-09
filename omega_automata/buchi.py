@@ -123,6 +123,10 @@ class BuchiAutomaton(OmegaAutomaton):
                 elif letter <= label:
                     yield Edge(src=src, dst=dst, key=key)
 
+    def get_label_for(self, edge: Edge) -> Function:
+        src, dst, key = edge.src, edge.dst, edge.key
+        return self._graph[src][dst][key]["label"]
+
     @property
     def epsilon_prop(self) -> Function:
         return self._epsilon
